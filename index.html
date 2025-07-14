@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Agora Web Voice</title>
+  <script src="https://download.agora.io/sdk/release/AgoraRTC_N.js"></script>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 20px;
+    }
+    textarea {
+      width: 100%;
+      height: 200px;
+      margin-top: 20px;
+      resize: none;
+    }
+    button {
+      margin-right: 10px;
+      padding: 10px 20px;
+    }
+  </style>
+</head>
+<body>
+  <h2>Agora Web 语音通话</h2>
+  <button onclick="join()">加入频道</button>
+  <button onclick="leave()">离开频道</button>
+
+  <textarea id="log" readonly></textarea>
+
+  <script>
+    const appId = "22c189ff53e245f1877a769bef20f9cc";
+    const token = null;
+    const channel = "Unity";
+
+    const client = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
+    let localTrack;
+
+    const logArea = document.getElementById("log");
+
+    function log(message) {
+      const time = new Date().toLocaleTimeString();
+      logArea.value += `[${time}] ${message}\n`;
+      logArea.scrollTop = logArea.scrollHeight;
+      console.log(message);
+    }
+
+    async function join() {
+      log("尝试加入频道...");
+      await client.join(appId, channel, token, null);
+      log("成功加入频道");
+
+      localTrack = await AgoraRTC.createMicrophoneAudioTrack();
+      await client.publish([localTrack]);
+      log("发布本地音频流");
+
+      client.on("user-published", async (user, mediaType) => {
+        log(`检测到远端用户 ${user.uid} 发布了媒体类型: ${mediaType}`);
+        await client.subscribe(user, mediaType);
+        log(`已订阅用户 ${user.uid} 的 ${mediaType} 流`);
+
+        if (mediaType === "audio") {
+          user.audioTrack.play();
+          log(`正在播放用户 ${user.uid} 的音频`);
+        }
+      });
+
+      client.on("user-unpublished", (user, mediaType) => {
+        log(`用户 ${user.uid} 停止发布 ${mediaType} 流`);
+      });
+
+      client.on("user-left", user => {
+        log(`用户 ${user.uid} 离开频道`);
+      });
+    }
+
+    async function leave() {
+      log("离开频道中...");
+      await client.leave();
+      if (localTrack) {
+        localTrack.stop();
+        localTrack.close();
+        log("关闭本地音频轨道");
+      }
+      log("已离开频道");
+    }
+  </script>
+</body>
+</html>
